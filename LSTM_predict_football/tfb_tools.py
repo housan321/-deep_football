@@ -702,6 +702,41 @@ def fb_get_features(htm,bars,ftg=''):
  
 
 
+
+###  提取多家主流菠菜公司初盘、晚盘赔率
+def fb_get_odds_features(htm, bars, ftg=''):
+    col_sgn = ['win0','draw0','lost0','back0','win9','draw9','lost9', 'back9', 'kelly_w', 'kelly_d', 'kelly_l']
+    odds_list = pd.DataFrame(columns=col_sgn)
+    
+    result = re.findall(r"var game=Array(.*)", htm)
+    result = re.findall(r"\(\"(.*)\"\)", result[0])
+    if len(result) < 1:
+        print("---------------  ---------------------")
+        return
+    result = re.split("\",\"", result[0])  
+    for cid in tfsys.cids:      
+        for value in result:
+            res = re.split("\|", value)
+            if res[0] == cid:  #找到该菠菜公司
+                data = res[3:6] + res[9:13] + res[16:20]
+                if res[10] == '' or res[11] == '' or res[16] == '':
+                    data[4:8] = data[0:4]    
+                data = pd.Series(data, index=col_sgn)
+                odds_list = odds_list.append(data, ignore_index=True)
+                break
+#    odds_list = align_odds(odds_list)    
+    odds_list = odds_list.iloc[0:32,:] ##只取32家菠菜公司赔率
+#    if ftg!='':odds_list.to_csv(ftg,index=False,encoding='gb18030')   
+    odds_list = odds_list.astype(float)  
+
+    
+    return odds_list
+
+
+
+
+
+
 #获取积分、进失球等数据
 def get_score_data(htm, keyword):
     cols = ['HTGS', 'ATGS', 'HTGC', 'ATGC', 'HTP', 'ATP', 
@@ -939,8 +974,9 @@ def fb_gid_getExt010(x10):
     fss_oz = tfsys.rhtmOuzhi + gid + '.js'
     fxdat_oz_1=tfsys.rxdat + gid + '_oz_1.dat'
     fxdat_oz_2=tfsys.rxdat + gid + '_oz_2.dat'
-    htm_oz = zweb.web_get001txtFg(uss_oz, fss_oz)    
-    fb_gid_getExt_oz4htm_1(htm_oz, bars,ftg=fxdat_oz_1)
+    htm_oz = zweb.web_get001txtFg(uss_oz, fss_oz)   
+    fb_get_odds_features(htm_oz, bars,ftg=fxdat_oz_1)
+#    fb_gid_getExt_oz4htm_1(htm_oz, bars,ftg=fxdat_oz_1)
     
     ### 3. 下载分析网页
     uss_fx = tfsys.us0_extFenxi + gid + '.htm'
