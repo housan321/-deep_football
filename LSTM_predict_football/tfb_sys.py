@@ -287,11 +287,17 @@ btvarNil=['', 0,0,0,0, 0,0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0,   0,0,0, 0,0,0,'']
 btvarSgn=['xtim', 'kret9','kret3','kret1','kret0',  'knum9','knum3','knum1','knum0',  'ret9','num9','nwin9', 'ret3','ret1','ret0',  'nwin3','nwin1','nwin0',  'num3','num1','num0'
           ,'v1','v2','v3','v4','v5','nday','doc']
 
-league=['日职联', '日职乙', '韩K联', '瑞典超', '挪超', '美职业', '巴西甲']
-leagueId={'英超':'36', '西甲':'31', '日职联':'25', '日职乙':'284', '韩K联':'15', '瑞典超':'26',
-          '挪超':'22', '美职业':'21', '巴西甲':'4'}
-subleagueId={'英超':'', '西甲':'', '日职联':'_943', '日职乙':'_808', '韩K联':'_313', '瑞典超':'_431',
-             '挪超':'', '美职业':'_165', '巴西甲':''}
+league=['瑞典超', '挪超', 
+        '日职联', '日职乙', '韩K联', 
+        '美职业', '巴西甲']
+leagueId={'英超':'36', '西甲':'31', '意甲':'34', '德甲':'8', '法甲':'11', 
+          '英冠':'37', '挪超':'22', '瑞典超':'26',
+          '日职联':'25', '日职乙':'284', '韩K联':'15', 
+          '美职业':'21', '巴西甲':'4'}
+subleagueId={'英超':'', '西甲':'', '意甲':'', '德甲':'', '法甲':'',
+             '英冠':'_87', '挪超':'', '瑞典超':'_431', 
+             '日职联':'_943', '日职乙':'_808', '韩K联':'_313', 
+             '美职业':'_165', '巴西甲':''}
  
 scNil = [0, '-1', 0, 0, 0, 0, 
          0, 0, 0, 0, 0, 0, 
@@ -329,8 +335,8 @@ rmlib=rdat0+'mlib/' #ai.mx.lib.xxx
 #rgdat=rdat0+'gdat/'
 #
 lghtm=rdat0+'xhtm/league/'  #联赛网页
-rghtm=rdat0+'xhtm/jshtm/'  #gids_htm,days
-rhtmOuzhi=rdat0+'xhtm/js_oz/'
+rghtm=rdat0+'xhtm/ghtm/'  #gids_htm,days 当天比赛场次
+rhtmOuzhi=rdat0+'xhtm/htm_oz/'
 rhtmYazhi=rdat0+'xhtm/htm_az/'
 rhtmFenxi=rdat0+'xhtm/htm_fx/'
 rhtmTouzhu=rdat0+'xhtm/htm_tz/'

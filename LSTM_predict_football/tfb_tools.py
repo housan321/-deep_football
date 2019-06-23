@@ -26,6 +26,7 @@ from bs4 import BeautifulSoup
 import time
 import datetime
 import re
+import copy
 
 #
 from concurrent import futures
@@ -102,10 +103,10 @@ def fb_init(rs0='/tfbDat/',fgid=''):
     if rs0!='':
         tfsys.rdat=rs0
         tfsys.rxdat=rs0+'xdat/'
-        tfsys.rhtmOuzhi=rs0+'xhtm/js_oz/'
+        tfsys.rhtmOuzhi=rs0+'xhtm/htm_oz/'
         tfsys.rhtmYazhi=rs0+'xhtm/htm_az/'
-        tfsys.rhtmShuju=rs0+'xhtm/htm_sj/'
-        
+        tfsys.rhtmFenxi=rs0+'xhtm/htm_fx/'
+        tfsys.rhtmTouzhu=rs0+'xhtm/htm_tz/'
     #4
     if fgid!='':
         tfsys.gidsFN=fgid
@@ -197,7 +198,7 @@ def fb_gid_get4htm(htm):
     return df
 
 ###############################################################################
-# 一个赛季所有场次的比赛的gid
+# 一个轮赛一个赛季所有场次的比赛的gid
 def fb_league_gids(htm, league, fgExt=True):
     df=pd.DataFrame(columns=tfsys.gidSgn,dtype=str)
     ds=pd.Series(tfsys.gidNil,index=tfsys.gidSgn,dtype=str)
@@ -237,10 +238,11 @@ def fb_league_gids(htm, league, fgExt=True):
             ds['tweek'] = str(n+1)  #第几轮赛事 
             ds['tsell'] = str(n+1)
             df=df.append(ds.T,ignore_index=True)
+            tfsys.gids=tfsys.gids.append(df)
+            tfsys.gids.drop_duplicates(subset='gid', keep='last', inplace=True)
 
-
-    if fgExt:fb_gid_getExt(df)    #单线程
-    else: fb_gid_getExtPool(df)   #多线程
+#    if fgExt:fb_gid_getExt(df)    #单线程
+#    else: fb_gid_getExtPool(df)   #多线程
 
     if tfsys.gidsFN!='':
         print('+++++')
@@ -382,7 +384,14 @@ def fb_gid_getExt_tz4clst(ds,clst):
     ds['hot_idx_h'],ds['hot_idx_d'],ds['hot_idx_g']=clst[28],clst[39],clst[50]
     
     #
-    return ds    
+    df = pd.DataFrame(columns=tfsys.gxdatSgn_tz) 
+    if ds['volume_h']=='' or ds['volume_d']=='' or ds['volume_g']=='' or ds['profit_h']=='' or ds['profit_d']=='' or ds['profit_g']=='': ###如果投注数据不足就返回空值
+        return df     
+#    if df.isnull().values.any(): return df ##如果有Nan值就返回空值
+    
+    df = df.append(ds.T, ignore_index=True) 
+    
+    return df    
 
 
 ###  提取多家主流菠菜公司初盘、晚盘赔率
@@ -703,10 +712,66 @@ def fb_get_features(htm,bars,ftg=''):
 
 
 
-###  提取多家主流菠菜公司初盘、晚盘赔率
+
+### 获取投注量特征
+def fb_get_volumes_features(htm, bars, ftg=''):
+    bs = BeautifulSoup(htm, 'html.parser')
+    tableList = bs.select("table")
+    ds = pd.Series(tfsys.gxdatNil_tz,index=tfsys.gxdatSgn_tz)
+    cols = ['vol_prob_h', 'vol_prob_d', 'vol_prob_g', 'loss_idx', 'loss_vol_ratio']
+    volumes_feature = pd.DataFrame(columns=cols)
+    ratio = pd.Series(index=cols,dtype=float)
+       
+    if len(tableList) != 6: ####网页数据有误
+        return volumes_feature
+    
+    tdArr = []
+    for td in tableList[4].select("td"):
+        tdArr.append(td.get_text())
+                
+    df = fb_gid_getExt_tz4clst(ds, tdArr) 
+    if len(df)==0: return volumes_feature  ##如果投注数据不足就返回空值
+    
+    df = df.astype(float)  
+    vol_prob_h = (df['vol_ratio_h'] / df['bf_prob_h'])[0]  #投注量比率 与 必发机率之间的比值
+    vol_prob_d = (df['vol_ratio_d'] / df['bf_prob_d'])[0]
+    vol_prob_g = (df['vol_ratio_g'] / df['bf_prob_g'])[0]
+    
+    volume = df[['volume_h', 'volume_d', 'volume_g']]
+    profit = df[['profit_h', 'profit_d', 'profit_g']]
+    
+    loss_idx = np.argmin(profit.values, axis=1)   #亏损值最大的选项
+    loss = profit.min(axis=1)
+    mask = copy.deepcopy(profit) 
+    mask[mask>loss[0]] = 1
+    mask[mask==loss[0]] = 0
+    mask.columns = ['volume_h', 'volume_d', 'volume_g']
+    
+    vol_sum = volume.sum(axis=1)  
+    loss_vol_ratio = abs(loss[0]) / vol_sum[0]  #最大的亏损值与投注总量的比值
+    
+    ratio['vol_prob_h'] = round(vol_prob_h, 3)
+    ratio['vol_prob_d'] = round(vol_prob_d, 3)
+    ratio['vol_prob_g'] = round(vol_prob_g, 3)
+    ratio['loss_idx'] = get_sign(str(loss_idx[0]))
+    ratio['loss_vol_ratio'] = round(loss_vol_ratio, 3)
+    
+    volumes_feature = volumes_feature.append(ratio.T, ignore_index=True)
+    
+    
+    return volumes_feature
+
+
+
+
+
+###  提取多家主流菠菜公司初盘、晚盘赔率,获取赔率特征
 def fb_get_odds_features(htm, bars, ftg=''):
     col_sgn = ['win0','draw0','lost0','back0','win9','draw9','lost9', 'back9', 'kelly_w', 'kelly_d', 'kelly_l']
+    cols = ['avg_win', 'avg_draw', 'avg_lost', 'avg_win_diff', 'avg_draw_diff', 'avg_lost_diff']
     odds_list = pd.DataFrame(columns=col_sgn)
+    odds_feature = pd.DataFrame(columns=cols)
+    odds = pd.Series(index=cols,dtype=float)
     
     result = re.findall(r"var game=Array(.*)", htm)
     result = re.findall(r"\(\"(.*)\"\)", result[0])
@@ -728,9 +793,23 @@ def fb_get_odds_features(htm, bars, ftg=''):
     odds_list = odds_list.iloc[0:32,:] ##只取32家菠菜公司赔率
 #    if ftg!='':odds_list.to_csv(ftg,index=False,encoding='gb18030')   
     odds_list = odds_list.astype(float)  
+    avg_win = odds_list['win9'].mean()
+    avg_draw = odds_list['draw9'].mean()
+    avg_lost = odds_list['lost9'].mean()
+    avg_win_diff = (odds_list['win9'] - odds_list['win0']).mean()
+    avg_draw_diff = (odds_list['draw9'] - odds_list['draw0']).mean()
+    avg_lost_diff = (odds_list['lost9'] - odds_list['lost0']).mean()
 
+    odds['avg_win'] = round(avg_win, 3)
+    odds['avg_draw'] = round(avg_draw, 3)
+    odds['avg_lost'] = round(avg_lost, 3)
+    odds['avg_win_diff'] = round(avg_win_diff, 3)
+    odds['avg_draw_diff'] = round(avg_draw_diff, 3)
+    odds['avg_lost_diff'] = round(avg_lost_diff, 3)
     
-    return odds_list
+    odds_feature = odds_feature.append(odds.T, ignore_index=True)
+    
+    return odds_feature
 
 
 
@@ -805,6 +884,9 @@ def get_VS_result(htm, keyword):
     result = re.findall(keyword, htm)
     res = result[0].split(' = ')
     data = re.findall(r"\[\[(.*)\]\]", res[0])
+    if len(data)==0: #如果没有找到数据，则按平局处理
+        TFormPtsStr = 'DDDDD'   
+        return TFormPtsStr 
     data = data[0].split('],[')
     TFormPtsStr = ''
     
@@ -823,7 +905,7 @@ def get_VS_result(htm, keyword):
     if len(TFormPtsStr) >= 5:
         TFormPtsStr = TFormPtsStr[:5] 
     else: 
-        for i in range(len(TFormPtsStr)-5):TFormPtsStr = kwins+'M'
+        for i in range(5-len(TFormPtsStr)):TFormPtsStr = TFormPtsStr+'D'  #如果对赛不够5场,以平局补够5场
 
 
     return TFormPtsStr  
@@ -883,9 +965,11 @@ def fb_get_score_features(htm, bars, ftg=''):
     
     matchDF = matchDF.append(match.T, ignore_index=True)
     
-    feature = pd.concat([scoreDF, matchDF], axis=1)
+    score_feature = pd.concat([scoreDF, matchDF], axis=1)
     
-    kk=0
+    return score_feature
+    
+
     
     '''
     result = re.findall(r"var v_data=\[.*\]", htm)
@@ -936,8 +1020,6 @@ def fb_get_score_features(htm, bars, ftg=''):
 
     '''
         
-    
-    return VTFormPtsStr
 
 
 
@@ -948,9 +1030,10 @@ def fb_gid_getExt010(x10):
     bars=pd.Series(x10,index=tfsys.gidSgn,dtype=str)
     gid=bars['gid']
     isdownload = False
-#    gid = '1549938'
-
-    ### 1.下载投注量网页
+#    gid = '1557789'
+    print('gid:', gid)
+    
+    ### 1.下载投注量网页，投注量比值特征
     uss_tz=tfsys.us0_extTouzhu+ gid +'.htm?%s'
     fss_tz=tfsys.rhtmTouzhu + gid + '.htm'
     fxdat_tz=tfsys.rxdat + gid + '_tz.dat' 
@@ -966,27 +1049,38 @@ def fb_gid_getExt010(x10):
             else: isdownload = True
     if not isdownload:
         return '######### can not download the html ##########'        
-    df = fb_gid_getExt_tz4htm(htm_tz,bars,ftg=fxdat_tz)
-    if df.empty: return
+#    df = fb_gid_getExt_tz4htm(htm_tz,bars,ftg=fxdat_tz)
+#    if df.empty: return
+    volumes_feature = fb_get_volumes_features(htm_tz,bars,ftg=fxdat_tz) 
+    if len(volumes_feature)==0: 
+        print('投注数据不足，不预测该场比赛')
+        return 
     
-    ### 2.下载赔率网页  
+    
+    ### 2.下载赔率网页，赔率特征  
     uss_oz = tfsys.us0_extOuzhi + gid + '.js'
     fss_oz = tfsys.rhtmOuzhi + gid + '.js'
     fxdat_oz_1=tfsys.rxdat + gid + '_oz_1.dat'
     fxdat_oz_2=tfsys.rxdat + gid + '_oz_2.dat'
     htm_oz = zweb.web_get001txtFg(uss_oz, fss_oz)   
-    fb_get_odds_features(htm_oz, bars,ftg=fxdat_oz_1)
+    odds_feature = fb_get_odds_features(htm_oz, bars,ftg=fxdat_oz_1)
 #    fb_gid_getExt_oz4htm_1(htm_oz, bars,ftg=fxdat_oz_1)
     
-    ### 3. 下载分析网页
+    ### 3. 下载分析网页，对赛，主、客队近期赛特征
     uss_fx = tfsys.us0_extFenxi + gid + '.htm'
     fss_fx = tfsys.rhtmFenxi + gid + '.htm'
     fxdat_fx = tfsys.rxdat + gid + '_fx.dat'
     htm_fx = zweb.web_get001txtFg(uss_fx, fss_fx)   
-    fb_get_score_features(htm_fx, bars,ftg=fxdat_fx)
+    score_feature = fb_get_score_features(htm_fx, bars,ftg=fxdat_fx)
     
 #    fb_gid_getExt_oz4htm_1(htm_oz,bars,ftg=fxdat_oz_1)
 #    fb_gid_getExt_oz4htm_2(htm_oz,bars,ftg=fxdat_oz_2)
+    
+    ### 4. 拼接所有特征值，并保存
+    features = pd.concat([score_feature, odds_feature, volumes_feature], axis=1)
+    features['FTR'] = bars['kwin']
+    fss_features = tfsys.rxdat + gid + '_ftr.dat'
+    features.to_csv(fss_features,index=False,encoding='gb18030') #把特征值保存下来
     
     return fss_oz
 
@@ -1068,10 +1162,10 @@ def fb_get_team_dataset(htm):
 
 #---- download samples
 # 下载轮赛每球队的数据，fgSample为下载赛季每场比赛的数据的标志 
-def fb_download_league_data(league, fgSample=False):
+def fb_download_league_data(league, season, fgSample=False):
     leagueId = tfsys.leagueId[league]
     subleagueId = tfsys.subleagueId[league]
-    season = '2018-2019'
+#    season = '2018-2019'
 
     fss=tfsys.lghtm + season + '_' + leagueId + '.js'        
     uss=tfsys.us0_league + season + '/s' + leagueId + subleagueId + '.js'      
@@ -1087,8 +1181,10 @@ def fb_download_league_data(league, fgSample=False):
 
 
     ### 2. 过去赛季比赛场次ID，赔率、及当时两队的对赛记录（用于算法的训练）
-    if fgSample: fb_league_gids(htm, league)
-#    
+    if fgSample:
+        fb_league_gids(htm, league)
+
+    
 #        if fgExt:fb_gid_getExt(df)
 #        else: fb_gid_getExtPool(df)
 #
@@ -1097,7 +1193,7 @@ def fb_download_league_data(league, fgSample=False):
 #        print(tfsys.gids.tail())
 #        tfsys.gids.to_csv(tfsys.gidsFN,index=False,encoding='gb18030')
         
-    return scoresDf 
+
 
 
 

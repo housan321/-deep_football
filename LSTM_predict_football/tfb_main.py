@@ -60,7 +60,12 @@ def main_download_samples():
     xtfb=tft.fb_init(rs0,fgid)
 
     #---download samples
-    tft.fb_download_league_data('英超', fgSample=True)
+    tft.fb_download_league_data('英冠', '2018-2019', fgSample=True)
+    tft.fb_download_league_data('英超', '2018-2019', fgSample=True)
+    tft.fb_download_league_data('西甲', '2018-2019', fgSample=True)
+    tft.fb_download_league_data('意甲', '2018-2019', fgSample=True)
+    tft.fb_download_league_data('法甲', '2018-2019', fgSample=True)
+    tft.fb_download_league_data('德甲', '2018-2019', fgSample=True)
 
 
 
