@@ -42,7 +42,6 @@ from sklearn.preprocessing import LabelEncoder
 
 
 def read_lstm_sample_files(file_name, num):
-    cv_sgn = ['win_cv_0', 'draw_cv_0', 'lost_cv_0', 'win_cv_9', 'draw_cv_9', 'lost_cv_9']
     #2---init.tfb
     rs0='/tfbDat/'
     fgid=rs0+'gid2019_js.dat'
@@ -67,10 +66,11 @@ def read_lstm_sample_files(file_name, num):
                 if features.isnull().values.any(): continue  ##如果有Nan值就不保存该数据 
                 
                 data = data.append(features, ignore_index=True)
-    data.loc[:,"kwin"][data.loc[:,"kwin"]==3] = 1   
-    data.rename(columns={'kwin':'FTR'}, inplace = True)
-                
-#    data.to_csv(file_name, index=False, encoding='gb18030')    
+    data.loc[:,"FTR"][data.loc[:,"FTR"]==1] = 0   
+    data.loc[:,"FTR"][data.loc[:,"FTR"]==3] = 1 
+  
+    data=data.drop(['vol_prob_h', 'vol_prob_d','vol_prob_g', 'loss_idx', 'loss_vol_ratio'],axis=1)
+    data=data.drop(['avg_win', 'avg_draw','avg_lost','avg_win_diff', 'avg_draw_diff','avg_lost_diff'],axis=1)
 
     return data
 
@@ -79,6 +79,7 @@ def read_lstm_sample_files(file_name, num):
 
 lstm_sample_files = 'data/lstm_samples.dat'
 data = read_lstm_sample_files(lstm_sample_files, [0, 3000])
+
 
 data.head()
 
@@ -105,10 +106,28 @@ data.VM3=hmLE.fit_transform(data.VM3)
 data.VM4=hmLE.fit_transform(data.VM4)
 data.VM5=hmLE.fit_transform(data.VM5)
 
-data.loss_idx=hmLE.fit_transform(data.loss_idx)
+# data.loss_idx=hmLE.fit_transform(data.loss_idx)
 
 
 data.head()
+
+
+onehotencoder=OneHotEncoder()
+onehotencoder.fit(data.FTR.reshape(-1,1))
+
+final=onehotencoder.transform([[each] for each in data.FTR]).toarray()
+
+final.shape
+
+data.loc[:,"final1"]=final[:,0]
+data.loc[:,"final2"]=final[:,1]
+
+dataT = data[1700:]
+data = data[:1700]
+
+
+data.to_csv('samples/allAtt_onehot_large_train.csv',index=None)
+dataT.to_csv('samples/allAtt_onehot_large_test.csv',index=None)
 
 
 

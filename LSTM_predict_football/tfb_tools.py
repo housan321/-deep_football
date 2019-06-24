@@ -1030,6 +1030,7 @@ def fb_gid_getExt010(x10):
     bars=pd.Series(x10,index=tfsys.gidSgn,dtype=str)
     gid=bars['gid']
     isdownload = False
+    features=pd.DataFrame()
 #    gid = '1557789'
     print('gid:', gid)
     
@@ -1077,8 +1078,9 @@ def fb_gid_getExt010(x10):
 #    fb_gid_getExt_oz4htm_2(htm_oz,bars,ftg=fxdat_oz_2)
     
     ### 4. 拼接所有特征值，并保存
+#    features.loc[0,"FTR"] = bars['kwin']
     features = pd.concat([score_feature, odds_feature, volumes_feature], axis=1)
-    features['FTR'] = bars['kwin']
+    features.insert(0,'FTR', bars['kwin'])
     fss_features = tfsys.rxdat + gid + '_ftr.dat'
     features.to_csv(fss_features,index=False,encoding='gb18030') #把特征值保存下来
     
