@@ -106,7 +106,7 @@ data.VM3=hmLE.fit_transform(data.VM3)
 data.VM4=hmLE.fit_transform(data.VM4)
 data.VM5=hmLE.fit_transform(data.VM5)
 
-# data.loss_idx=hmLE.fit_transform(data.loss_idx)
+#data.loss_idx=hmLE.fit_transform(data.loss_idx)
 
 
 data.head()
@@ -122,8 +122,8 @@ final.shape
 data.loc[:,"final1"]=final[:,0]
 data.loc[:,"final2"]=final[:,1]
 
-dataT = data[1700:]
-data = data[:1700]
+dataT = data[700:]
+data = data[:700]
 
 
 data.to_csv('samples/allAtt_onehot_large_train.csv',index=None)

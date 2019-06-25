@@ -74,7 +74,7 @@ def train_neural_network(x):
     saver=tf.train.Saver()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        hm_epochs=20
+        hm_epochs=30
         for epoch in range(hm_epochs):
             epoch_loss = 0
             for i in range(0,data.shape[0],batch_size):

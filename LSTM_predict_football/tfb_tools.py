@@ -241,8 +241,8 @@ def fb_league_gids(htm, league, fgExt=True):
             tfsys.gids=tfsys.gids.append(df)
             tfsys.gids.drop_duplicates(subset='gid', keep='last', inplace=True)
 
-#    if fgExt:fb_gid_getExt(df)    #单线程
-#    else: fb_gid_getExtPool(df)   #多线程
+    if fgExt:fb_gid_getExt(df)    #单线程
+    else: fb_gid_getExtPool(df)   #多线程
 
     if tfsys.gidsFN!='':
         print('+++++')
@@ -837,6 +837,8 @@ def get_score_data(htm, keyword):
     ATGS = 0.0
     ATGC = 0.0
     ATP = 0.0
+    GS_MAX = 0
+    GC_MAX = 0
     datas = re.findall(keyword, htm)
     datas = datas[0].split('\",\"')
     for data in datas:
@@ -845,26 +847,29 @@ def get_score_data(htm, keyword):
         data = data[pos:]
         res = re.split("\|", data)
         teamId = res[2]
+        MW = float(res[5]) ##比赛轮次
         if teamId==homeId:
             HomeTeamLP = float(res[1])
             HTGS = float(res[15])
             HTGC = float(res[16])
-            HTP = float(res[17])
+            HTP = float(res[17]) / MW
+            HTGD = (HTGS - HTGC)
         if teamId==awayId:
             AwayTeamLP = float(res[1])
             ATGS = float(res[15])
             ATGC = float(res[16])
-            ATP = float(res[17])
+            ATP = float(res[17]) / MW
+            ATGD = (ATGS - ATGC)
+        if float(res[15])>GS_MAX: GS_MAX=float(res[15])
+        if float(res[16])>GC_MAX: GC_MAX=float(res[16])         
             
-    HTGD = HTGS - HTGC
-    ATGD = ATGS - ATGC
     DiffPts = HTP - ATP
     DiffLP = HomeTeamLP - AwayTeamLP
     
-    score['HTGS'] = HTGS
-    score['ATGS'] = ATGS
-    score['HTGC'] = HTGC
-    score['ATGC'] = ATGC
+    score['HTGS'] = HTGS / GS_MAX
+    score['ATGS'] = ATGS / GS_MAX
+    score['HTGC'] = HTGC / GC_MAX
+    score['ATGC'] = ATGC / GC_MAX
     score['HTP'] = HTP
     score['ATP'] = ATP
     score['HTGD'] = HTGD
@@ -874,7 +879,7 @@ def get_score_data(htm, keyword):
     
     scoreDF = scoreDF.append(score.T, ignore_index=True)
 
-    return scoreDF
+    return scoreDF, MW
 
 
 
@@ -928,7 +933,7 @@ def fb_get_score_features(htm, bars, ftg=''):
     VTFormPtsStr = get_VS_result(htm, "var v_data=\[.*\]")
     HTFormPtsStr = get_VS_result(htm, "var h_data=\[.*\]")
     ATFormPtsStr = get_VS_result(htm, "var a_data=\[.*\]")
-    scoreDF = get_score_data(htm, "var ScoreAll = Array(.*)")
+    scoreDF, MW = get_score_data(htm, "var ScoreAll = Array(.*)")
 
     ##近5场对赛结果
     match['VM1'] = VTFormPtsStr[0]
@@ -961,7 +966,7 @@ def fb_get_score_features(htm, bars, ftg=''):
     HTFormPts = get_form_points(HTFormPtsStr)
     ATFormPts = get_form_points(ATFormPtsStr)  
     DiffFormPts = HTFormPts - ATFormPts
-    match['DiffFormPts'] = DiffFormPts
+    match['DiffFormPts'] = DiffFormPts / MW #除以轮次 
     
     matchDF = matchDF.append(match.T, ignore_index=True)
     
@@ -1031,7 +1036,7 @@ def fb_gid_getExt010(x10):
     gid=bars['gid']
     isdownload = False
     features=pd.DataFrame()
-#    gid = '1557789'
+#    gid = '1552246'
     print('gid:', gid)
     
     ### 1.下载投注量网页，投注量比值特征
